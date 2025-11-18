@@ -1,4 +1,5 @@
 import pygame
+import random
 from settings import *
 
 class Player(pygame.sprite.Sprite):
@@ -30,6 +31,12 @@ class Player(pygame.sprite.Sprite):
         self.invulnerable_timer = 0
         self.blinking = False
         self.blink_counter = 0
+        self.level = 1
+        self.xp = 0
+        self.xp_to_next = 100
+        self.score_multiplier = 1.0
+        self.speed = PLAYER_SPEED
+        self.jump_power = JUMP_POWER
         
     def load_images(self):
         # Create temporary colored rectangles - replace with actual sprites later
@@ -63,7 +70,7 @@ class Player(pygame.sprite.Sprite):
     def jump(self):
         """Make the player jump if they're on the ground"""
         if self.on_ground:
-            self.vel_y = JUMP_POWER
+            self.vel_y = self.jump_power
             self.on_ground = False
     
     def die(self):
@@ -87,7 +94,7 @@ class Player(pygame.sprite.Sprite):
                 for hit in hits:
                     if self.rect.bottom < hit.rect.centery:
                         self.vel_y = ENEMY_BOUNCE_HEIGHT
-                        self.score += 100
+                        self.reward_enemy_defeat()
                         return True
                         
         # Check for side collisions with enemies
@@ -165,11 +172,11 @@ class Player(pygame.sprite.Sprite):
         self.walking = False
         
         if keys[pygame.K_LEFT]:
-            self.vel_x = -PLAYER_SPEED
+            self.vel_x = -self.speed
             self.facing_right = False
             self.walking = True
         if keys[pygame.K_RIGHT]:
-            self.vel_x = PLAYER_SPEED
+            self.vel_x = self.speed
             self.facing_right = True
             self.walking = True
             
@@ -192,4 +199,71 @@ class Player(pygame.sprite.Sprite):
         
         # Check if reached end of level
         if self.rect.x > LEVEL_WIDTH - 250:
-            self.game.next_level()
+            self.game.on_level_complete()
+
+    def collect_coin(self):
+        self.score += int(10 * self.score_multiplier)
+        self.gain_xp(5)
+
+    def reward_enemy_defeat(self):
+        self.score += int(100 * self.score_multiplier)
+        self.gain_xp(20)
+
+    def reward_level_clear(self, level_number):
+        self.score += int(250 * self.score_multiplier)
+        bonus_xp = 60 + level_number * 5
+        self.gain_xp(bonus_xp)
+
+    def apply_powerup_reward(self, reward):
+        if not reward:
+            return
+        reward_type = reward.get("type")
+        label = reward.get("label", "Power Up")
+        if reward_type == "xp":
+            amount = reward.get("amount", 0)
+            self.gain_xp(amount)
+            message = f"{label}: +{amount} XP"
+        elif reward_type == "life":
+            amount = reward.get("amount", 0)
+            self.lives += amount
+            message = f"{label}: +{amount} Life"
+        elif reward_type == "score":
+            amount = reward.get("amount", 0)
+            self.score += int(amount * self.score_multiplier)
+            message = f"{label}: +{amount} Score"
+        else:
+            message = label
+
+        self.game.push_notification(message)
+
+    def gain_xp(self, amount):
+        self.xp += amount
+        while self.xp >= self.xp_to_next:
+            self.xp -= self.xp_to_next
+            self.level += 1
+            bonus_name = self.apply_level_up_bonus()
+            self.xp_to_next = int(self.xp_to_next * 1.35)
+            self.game.push_notification(f"Level {self.level}: {bonus_name}")
+
+    def apply_level_up_bonus(self):
+        bonuses = [
+            ("Fleet Boots", self._boost_speed),
+            ("Sky Shoes", self._boost_jump),
+            ("Spirit Heart", self._boost_life),
+            ("Treasure Sense", self._boost_score)
+        ]
+        name, func = random.choice(bonuses)
+        func()
+        return name
+
+    def _boost_speed(self):
+        self.speed = min(self.speed + 0.3, PLAYER_SPEED + 3)
+
+    def _boost_jump(self):
+        self.jump_power -= 0.5
+
+    def _boost_life(self):
+        self.lives += 1
+
+    def _boost_score(self):
+        self.score_multiplier = min(self.score_multiplier + 0.15, 3.0)

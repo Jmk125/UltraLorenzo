@@ -1,11 +1,12 @@
 import pygame
 import sys
+import random
+from datetime import datetime
 from settings import *
 from player import Player
 from level import LevelGenerator
-from powerups import PowerUpBox
 from camera import Camera
-from datetime import datetime
+
 
 class Game:
     def __init__(self):
@@ -13,66 +14,91 @@ class Game:
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption("UltraLorenzo")
         self.clock = pygame.time.Clock()
-        
-        # Game state
+
         self.running = True
-        self.game_active = True
+        self.state = "title"
         self.level_number = 1
         self.start_time = datetime.utcnow()
-        self.username = "Jmk125"  # Current user's login
-        
-        self.setup_new_game()
-        
-    def setup_new_game(self):
-        # Create camera
-        self.camera = Camera(LEVEL_WIDTH, LEVEL_HEIGHT)
-        
-        # Create sprite groups
+        self.username = "Jmk125"
+
+        self.camera = None
+        self.player = None
+        self.level_generator = LevelGenerator(self)
         self.all_sprites = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
         self.coins = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
         self.powerup_boxes = pygame.sprite.Group()
-        self.decorations = pygame.sprite.Group()
-        
-        # Create player
+        self.notifications = []
+        self.current_theme = {"name": "Sky Realm", "sky": SKY_BLUE}
+        self.title_particles = self.create_title_particles()
+
+    def create_title_particles(self):
+        particles = []
+        for _ in range(80):
+            particles.append({
+                "x": random.uniform(0, WINDOW_WIDTH),
+                "y": random.uniform(0, WINDOW_HEIGHT),
+                "speed": random.uniform(0.3, 1.2),
+                "size": random.randint(1, 3)
+            })
+        return particles
+
+    def start_run(self):
+        self.level_number = 1
+        self.start_time = datetime.utcnow()
+        self.notifications.clear()
+        self.setup_new_game()
+        self.state = "playing"
+
+    def setup_new_game(self):
+        self.camera = Camera(LEVEL_WIDTH, LEVEL_HEIGHT)
+        self.all_sprites = pygame.sprite.Group()
+        self.platforms = pygame.sprite.Group()
+        self.coins = pygame.sprite.Group()
+        self.enemies = pygame.sprite.Group()
+        self.powerup_boxes = pygame.sprite.Group()
+
         self.player = Player(self)
         self.all_sprites.add(self.player)
-        
-        # Generate level
-        self.level_generator = LevelGenerator(self)
         self.generate_new_level()
 
+    def get_difficulty_profile(self):
+        level_index = max(1, self.level_number)
+        gap_scale = min(1.0 + 0.05 * (level_index - 1), 1.7)
+        enemy_density = min(0.25 + 0.05 * (level_index - 1), 0.8)
+        moving_platform_chance = min(0.08 + 0.02 * (level_index - 1), 0.45)
+        enemy_speed_scale = min(1.0 + 0.05 * (level_index - 1), 1.8)
+        coin_cluster_size = min(4 + level_index, 8)
+        mid_powerup_chance = max(0.4 - 0.03 * (level_index - 1), 0.15)
+        return {
+            "gap_scale": gap_scale,
+            "enemy_density": enemy_density,
+            "moving_platform_chance": moving_platform_chance,
+            "enemy_speed_scale": enemy_speed_scale,
+            "coin_cluster_size": coin_cluster_size,
+            "mid_powerup_chance": mid_powerup_chance
+        }
+
     def generate_new_level(self):
-        # Clear existing sprites
-        for sprite in self.all_sprites:
-            if sprite != self.player:
-                sprite.kill()
-        
-        # Empty all groups
-        self.platforms.empty()
-        self.coins.empty()
-        self.enemies.empty()
-        self.powerup_boxes.empty()
-        
-        # Generate new level with separate background layers
-        background, midground, platforms, coins, enemies, foreground = self.level_generator.generate_level()
-        
-        # Store the groups
+        if not self.player:
+            return
+        difficulty = self.get_difficulty_profile()
+        background, midground, platforms, coins, enemies, powerups, foreground, theme = self.level_generator.generate_level(difficulty)
+
         self.platforms = platforms
         self.coins = coins
         self.enemies = enemies
-        
-        # Clear all sprites and rebuild in correct order
+        self.powerup_boxes = powerups
+        self.current_theme = theme
+
         self.all_sprites.empty()
-        
-        # Add sprites one by one to maintain strict order
         for sprite in background:
-            self.all_sprites.add(sprite)  # Mountains in back
+            self.all_sprites.add(sprite)
         for sprite in midground:
-            self.all_sprites.add(sprite)  # Hills and clouds
+            self.all_sprites.add(sprite)
         for sprite in foreground:
-            self.all_sprites.add(sprite)  # End marker now goes BEFORE platforms
+            self.all_sprites.add(sprite)
         for sprite in self.platforms:
             self.all_sprites.add(sprite)
         for sprite in self.powerup_boxes:
@@ -81,133 +107,172 @@ class Game:
             self.all_sprites.add(sprite)
         for sprite in self.enemies:
             self.all_sprites.add(sprite)
-        self.all_sprites.add(self.player)  # Player is now in front of everything
-        
-        # Reset player position
+        self.all_sprites.add(self.player)
+
         self.player.spawn()
 
-    def next_level(self):
+    def push_notification(self, text, duration=2500):
+        self.notifications.append({
+            "text": text,
+            "time": pygame.time.get_ticks(),
+            "duration": duration
+        })
+
+    def on_level_complete(self):
+        if not self.player:
+            return
+        self.player.reward_level_clear(self.level_number)
         self.level_number += 1
         self.generate_new_level()
+        self.push_notification(f"World {self.level_number} intensifies")
 
     def game_over(self):
-        self.game_active = False
+        self.state = "game_over"
+
+    def update_gameplay(self):
+        self.all_sprites.update()
+        self.camera.update(self.player)
+
+        coin_hits = pygame.sprite.spritecollide(self.player, self.coins, True)
+        for _ in coin_hits:
+            self.player.collect_coin()
+
+        powerup_hits = pygame.sprite.spritecollide(self.player, self.powerup_boxes, False)
+        for box in powerup_hits:
+            reward = box.hit()
+            if reward:
+                self.player.apply_powerup_reward(reward)
+
+    def draw_gameplay(self):
+        self.screen.fill(self.current_theme.get("sky", SKY_BLUE))
+        for sprite in self.all_sprites.sprites():
+            if not (sprite == self.player and self.player.invulnerable and self.player.blinking):
+                self.screen.blit(sprite.image, self.camera.apply(sprite))
+        self.draw_hud()
 
     def draw_hud(self):
-        # Setup font
         font = pygame.font.Font(None, 36)
-        
-        # Draw score
         score_text = font.render(f'Score: {self.player.score}', True, WHITE)
         self.screen.blit(score_text, (10, 10))
-        
-        # Draw lives
+
         lives_text = font.render(f'Lives: {self.player.lives}', True, WHITE)
         self.screen.blit(lives_text, (10, 50))
-        
-        # Draw level
-        level_text = font.render(f'Level: {self.level_number}', True, WHITE)
+
+        level_text = font.render(f'World: {self.level_number}', True, WHITE)
         self.screen.blit(level_text, (10, 90))
-        
-        # Draw player name
+
         player_text = font.render(f'Player: {self.username}', True, WHITE)
         self.screen.blit(player_text, (10, 130))
-        
-        # Draw time
+
         elapsed_time = (datetime.utcnow() - self.start_time).seconds
         minutes = elapsed_time // 60
         seconds = elapsed_time % 60
         time_text = font.render(f'Time: {minutes:02d}:{seconds:02d}', True, WHITE)
         self.screen.blit(time_text, (10, 170))
 
+        xp_ratio = self.player.xp / self.player.xp_to_next if self.player.xp_to_next else 0
+        bar_width = 260
+        bar_rect = pygame.Rect(10, 210, bar_width, 20)
+        pygame.draw.rect(self.screen, (255, 255, 255), bar_rect, 2)
+        fill_rect = pygame.Rect(12, 212, int((bar_width - 4) * xp_ratio), 16)
+        pygame.draw.rect(self.screen, (255, 215, 0), fill_rect)
+        xp_text = font.render(f'Level {self.player.level}  XP {self.player.xp}/{self.player.xp_to_next}', True, WHITE)
+        self.screen.blit(xp_text, (10, 240))
+
+        theme_text = font.render(f'Biome: {self.current_theme.get("name", "")}', True, WHITE)
+        self.screen.blit(theme_text, (10, 280))
+
+        now = pygame.time.get_ticks()
+        self.notifications = [n for n in self.notifications if now - n["time"] < n["duration"]]
+        note_font = pygame.font.Font(None, 28)
+        for index, note in enumerate(self.notifications):
+            text_surface = note_font.render(note["text"], True, YELLOW)
+            self.screen.blit(text_surface, (WINDOW_WIDTH - text_surface.get_width() - 20, 20 + index * 28))
+
+    def draw_title_screen(self):
+        self.screen.fill((8, 12, 35))
+        for star in self.title_particles:
+            star["y"] += star["speed"]
+            if star["y"] > WINDOW_HEIGHT:
+                star["y"] = 0
+                star["x"] = random.uniform(0, WINDOW_WIDTH)
+            pygame.draw.circle(self.screen, (200, 220, 255), (int(star["x"]), int(star["y"])), star["size"])
+
+        title_font = pygame.font.Font(None, 96)
+        title = title_font.render("UltraLorenzo", True, WHITE)
+        title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 3))
+        self.screen.blit(title, title_rect)
+
+        subtitle_font = pygame.font.Font(None, 48)
+        subtitle = subtitle_font.render("Rogue Run", True, (255, 215, 0))
+        sub_rect = subtitle.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 3 + 60))
+        self.screen.blit(subtitle, sub_rect)
+
+        info_font = pygame.font.Font(None, 32)
+        lines = [
+            "Procedural worlds with escalating danger",
+            "Defeat enemies & collect coins to gain XP",
+            "Level up for random permanent bonuses",
+            "Press SPACE or ENTER to begin"
+        ]
+        for idx, line in enumerate(lines):
+            text = info_font.render(line, True, WHITE)
+            rect = text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + idx * 30))
+            self.screen.blit(text, rect)
+
     def draw_game_over(self):
-        # Game Over text
-        font_large = pygame.font.Font(None, 74)
-        text = font_large.render('Game Over!', True, WHITE)
-        text_rect = text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 - 50))
+        self.screen.fill((15, 5, 20))
+        font_large = pygame.font.Font(None, 72)
+        text = font_large.render('Run Over', True, WHITE)
+        text_rect = text.get_rect(center=(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 3))
         self.screen.blit(text, text_rect)
-        
-        # Setup font for other text
-        font = pygame.font.Font(None, 36)
-        
-        # Final Score
-        score_text = font.render(f'Final Score: {self.player.score}', True, WHITE)
-        score_rect = score_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 20))
+
+        font = pygame.font.Font(None, 40)
+        score_text = font.render(f'Score: {self.player.score}', True, WHITE)
+        score_rect = score_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 - 20))
         self.screen.blit(score_text, score_rect)
-        
-        # Level reached
-        level_text = font.render(f'Level Reached: {self.level_number}', True, WHITE)
-        level_rect = level_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 60))
+
+        level_text = font.render(f'World Reached: {self.level_number}', True, WHITE)
+        level_rect = level_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 20))
         self.screen.blit(level_text, level_rect)
-        
-        # Time played
-        elapsed_time = (datetime.utcnow() - self.start_time).seconds
-        minutes = elapsed_time // 60
-        seconds = elapsed_time % 60
-        time_text = font.render(f'Time Played: {minutes:02d}:{seconds:02d}', True, WHITE)
-        time_rect = time_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 100))
-        self.screen.blit(time_text, time_rect)
-        
-        # Restart instruction
-        restart_text = font.render('Press R to Restart', True, WHITE)
-        restart_rect = restart_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 160))
+
+        xp_text = font.render(f'Hero Level: {self.player.level}', True, WHITE)
+        xp_rect = xp_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 60))
+        self.screen.blit(xp_text, xp_rect)
+
+        restart_text = font.render('Press R to return to the title', True, (255, 215, 0))
+        restart_rect = restart_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 120))
         self.screen.blit(restart_text, restart_rect)
 
     def run(self):
         while self.running:
             self.clock.tick(FPS)
-            
-            # Event handling
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE and self.game_active:
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.running = False
+                    elif self.state == "playing" and event.key == pygame.K_SPACE:
                         self.player.jump()
-                    elif event.key == pygame.K_r and not self.game_active:
-                        self.game_active = True
-                        self.level_number = 1
-                        self.start_time = datetime.utcnow()
-                        self.setup_new_game()
-            
-            if self.game_active:
-                # Update
-                self.all_sprites.update()
-                self.camera.update(self.player)
-                
-                # Check for coin collisions
-                coin_hits = pygame.sprite.spritecollide(self.player, self.coins, True)
-                for coin in coin_hits:
-                    self.player.score += 10
-                
-                # Check for powerup box collisions
-                powerup_hits = pygame.sprite.spritecollide(self.player, self.powerup_boxes, False)
-                for box in powerup_hits:
-                    if box.hit():
-                        self.player.score += 50
-                
-                # Draw
-                self.screen.fill(SKY_BLUE)
-                
-                # Draw all sprites with camera offset in their added order
-                for sprite in self.all_sprites.sprites():  # Changed from self.all_sprites to self.all_sprites.sprites()
-                    if not (sprite == self.player and 
-                           self.player.invulnerable and 
-                           self.player.blinking):
-                        self.screen.blit(sprite.image, self.camera.apply(sprite))
-                
-                # Draw HUD
-                self.draw_hud()
+                    elif self.state == "title" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        self.start_run()
+                    elif self.state == "game_over" and event.key == pygame.K_r:
+                        self.state = "title"
+
+            if self.state == "playing":
+                self.update_gameplay()
+                self.draw_gameplay()
+            elif self.state == "title":
+                self.draw_title_screen()
             else:
-                # Draw game over screen
-                self.screen.fill(BLACK)
                 self.draw_game_over()
-            
-            # Update display
+
             pygame.display.flip()
-            
+
         pygame.quit()
         sys.exit()
+
 
 if __name__ == "__main__":
     game = Game()
