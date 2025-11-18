@@ -1,5 +1,12 @@
 import pygame
+import random
 from settings import *
+
+POWERUP_REWARDS = [
+    {"type": "xp", "amount": 40, "label": "Wisdom Fragment"},
+    {"type": "life", "amount": 1, "label": "Spare Heart"},
+    {"type": "score", "amount": 200, "label": "Treasure Cache"}
+]
 
 class PowerUp(pygame.sprite.Sprite):
     def __init__(self, x, y, type_):
@@ -24,9 +31,9 @@ class PowerUpBox(pygame.sprite.Sprite):
 
     def hit(self):
         current_time = pygame.time.get_ticks()
-        if self.has_powerup and current_time - self.hit_time > 1000:  # Prevent multiple hits
+        if self.has_powerup and current_time - self.hit_time > 1000:
             self.has_powerup = False
             self.hit_time = current_time
-            self.image.fill((100, 100, 100))  # Change color to indicate empty
-            return True
-        return False
+            self.image.fill((100, 100, 100))
+            return random.choice(POWERUP_REWARDS)
+        return None
