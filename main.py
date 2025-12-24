@@ -123,8 +123,31 @@ class Game:
             return
         self.player.reward_level_clear(self.level_number)
         self.level_number += 1
-        self.generate_new_level()
-        self.push_notification(f"World {self.level_number} intensifies")
+
+        # Check if player has pending level-ups
+        if self.player.pending_level_ups > 0:
+            self.state = "level_up"
+            self.upgrade_choices = self.get_upgrade_choices()
+        else:
+            self.generate_new_level()
+            self.push_notification(f"World {self.level_number} intensifies")
+
+    def get_upgrade_choices(self):
+        """Generate 3 random upgrade choices for the level-up screen."""
+        all_upgrades = [
+            {"name": "Fleet Boots", "desc": f"Speed +{UPGRADE_SPEED_BOOST}"},
+            {"name": "Sky Shoes", "desc": f"Jump +{UPGRADE_JUMP_BOOST}"},
+            {"name": "Spirit Heart", "desc": "+1 Life"},
+            {"name": "Treasure Sense", "desc": f"Score x{1 + UPGRADE_SCORE_MULTIPLIER:.2f}"},
+        ]
+
+        # Add fireball if player doesn't have it yet
+        if not self.player.has_fireball and FIREBALL_ENABLED:
+            all_upgrades.append({"name": "Fireball", "desc": "Press X to shoot!"})
+
+        # Return 3 random unique choices
+        import random
+        return random.sample(all_upgrades, min(3, len(all_upgrades)))
 
     def game_over(self):
         self.state = "game_over"
@@ -208,13 +231,15 @@ class Game:
         sub_rect = subtitle.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 3 + 60))
         self.screen.blit(subtitle, sub_rect)
 
-        info_font = pygame.font.Font(None, 32)
+        info_font = pygame.font.Font(None, 28)
         lines = [
             "Procedural worlds with escalating danger",
             "Defeat enemies & collect coins to gain XP",
-            "Level up for random permanent bonuses",
+            "Level up to choose powerful upgrades",
+            "Clear all collectibles to unlock exit",
             "Arrow keys to move, SPACE to jump",
             "Hold SHIFT to run & jump farther",
+            "Press X to shoot (when unlocked)",
             "Press SPACE or ENTER to begin"
         ]
         for idx, line in enumerate(lines):
@@ -246,6 +271,63 @@ class Game:
         restart_rect = restart_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 120))
         self.screen.blit(restart_text, restart_rect)
 
+    def draw_level_up(self):
+        """Draw the level-up screen with upgrade choices."""
+        self.screen.fill((20, 10, 40))
+
+        # Title
+        title_font = pygame.font.Font(None, 72)
+        title = title_font.render("LEVEL UP!", True, (255, 215, 0))
+        title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, 80))
+        self.screen.blit(title, title_rect)
+
+        # Level info
+        info_font = pygame.font.Font(None, 36)
+        level_text = info_font.render(f"Hero Level {self.player.level}", True, WHITE)
+        level_rect = level_text.get_rect(center=(WINDOW_WIDTH // 2, 140))
+        self.screen.blit(level_text, level_rect)
+
+        # Instructions
+        instruction_font = pygame.font.Font(None, 28)
+        instruction = instruction_font.render("Choose an upgrade (Press 1, 2, or 3)", True, (200, 200, 200))
+        instruction_rect = instruction.get_rect(center=(WINDOW_WIDTH // 2, 190))
+        self.screen.blit(instruction, instruction_rect)
+
+        # Draw upgrade options
+        option_font = pygame.font.Font(None, 40)
+        desc_font = pygame.font.Font(None, 28)
+
+        box_width = 220
+        box_height = 120
+        spacing = 30
+        start_y = 250
+        total_width = (box_width * 3) + (spacing * 2)
+        start_x = (WINDOW_WIDTH - total_width) // 2
+
+        for i, upgrade in enumerate(self.upgrade_choices):
+            x = start_x + i * (box_width + spacing)
+            y = start_y
+
+            # Draw box background
+            box_rect = pygame.Rect(x, y, box_width, box_height)
+            pygame.draw.rect(self.screen, (60, 40, 80), box_rect)
+            pygame.draw.rect(self.screen, (255, 215, 0), box_rect, 3)
+
+            # Draw number
+            number_text = option_font.render(str(i + 1), True, (255, 215, 0))
+            number_rect = number_text.get_rect(center=(x + box_width // 2, y + 25))
+            self.screen.blit(number_text, number_rect)
+
+            # Draw upgrade name
+            name_text = desc_font.render(upgrade["name"], True, WHITE)
+            name_rect = name_text.get_rect(center=(x + box_width // 2, y + 60))
+            self.screen.blit(name_text, name_rect)
+
+            # Draw upgrade description
+            desc_text = desc_font.render(upgrade["desc"], True, (200, 200, 200))
+            desc_rect = desc_text.get_rect(center=(x + box_width // 2, y + 90))
+            self.screen.blit(desc_text, desc_rect)
+
     def run(self):
         while self.running:
             self.clock.tick(FPS)
@@ -255,18 +337,30 @@ class Game:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
-                    elif self.state == "playing" and event.key == pygame.K_SPACE:
-                        self.player.jump()
+                    elif self.state == "playing":
+                        if event.key == pygame.K_SPACE:
+                            self.player.jump()
+                        elif event.key == pygame.K_x:
+                            self.player.shoot_fireball()
                     elif self.state == "title" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
                         self.start_run()
                     elif self.state == "game_over" and event.key == pygame.K_r:
                         self.state = "title"
+                    elif self.state == "level_up":
+                        if event.key == pygame.K_1 and len(self.upgrade_choices) >= 1:
+                            self.apply_upgrade_choice(0)
+                        elif event.key == pygame.K_2 and len(self.upgrade_choices) >= 2:
+                            self.apply_upgrade_choice(1)
+                        elif event.key == pygame.K_3 and len(self.upgrade_choices) >= 3:
+                            self.apply_upgrade_choice(2)
 
             if self.state == "playing":
                 self.update_gameplay()
                 self.draw_gameplay()
             elif self.state == "title":
                 self.draw_title_screen()
+            elif self.state == "level_up":
+                self.draw_level_up()
             else:
                 self.draw_game_over()
 
@@ -274,6 +368,21 @@ class Game:
 
         pygame.quit()
         sys.exit()
+
+    def apply_upgrade_choice(self, choice_index):
+        """Apply the selected upgrade and proceed."""
+        upgrade = self.upgrade_choices[choice_index]
+        self.player.apply_upgrade(upgrade["name"])
+        self.player.pending_level_ups -= 1
+
+        # If more level-ups pending, show another screen
+        if self.player.pending_level_ups > 0:
+            self.upgrade_choices = self.get_upgrade_choices()
+        else:
+            # No more level-ups, continue to next level
+            self.state = "playing"
+            self.generate_new_level()
+            self.push_notification(f"World {self.level_number} intensifies")
 
 
 if __name__ == "__main__":

@@ -242,7 +242,9 @@ class LevelGenerator:
         if difficulty_profile["enemy_density"] > 0.45:
             enemy_classes.append(FlyerEnemy)
 
-        while current_x < LEVEL_WIDTH - 400:
+        # End level generation before final area to ensure final box is last collectible
+        level_end_x = LEVEL_WIDTH - 450
+        while current_x < level_end_x:
             width = random.randint(MIN_PLATFORM_WIDTH, MAX_PLATFORM_WIDTH)
             min_y = max(last_platform_y - MAX_JUMP_HEIGHT, LEVEL_HEIGHT - 320)
             max_y = min(last_platform_y + MAX_JUMP_HEIGHT, LEVEL_HEIGHT - 120)

@@ -42,6 +42,23 @@ PLAYER_SPAWN_Y = 400
 STARTING_LIVES = 3
 PLAYER_INVULNERABILITY_TIME = 1000  # milliseconds of invulnerability after getting hit
 
+# Upgrade bonuses (tweakable)
+UPGRADE_SPEED_BOOST = 0.3      # Speed increase per Fleet Boots upgrade
+UPGRADE_JUMP_BOOST = 0.5       # Jump power increase per Sky Shoes upgrade
+UPGRADE_SCORE_MULTIPLIER = 0.15  # Score multiplier increase per Treasure Sense upgrade
+UPGRADE_MAX_SPEED = 3          # Max speed increase allowed
+UPGRADE_MAX_SCORE_MULT = 3.0   # Max score multiplier allowed
+
+# Fireball ability (tweakable)
+FIREBALL_ENABLED = True        # Enable/disable fireball ability
+FIREBALL_SPEED = 6             # Horizontal speed of fireball
+FIREBALL_BOUNCE_POWER = -8     # Vertical bounce strength (negative = upward)
+FIREBALL_GRAVITY = 0.6         # Gravity applied to fireball
+FIREBALL_MAX_DISTANCE = 400    # Maximum travel distance before disappearing
+FIREBALL_COOLDOWN = 1000       # Cooldown in milliseconds
+FIREBALL_DAMAGE = 1            # Damage dealt to enemies
+FIREBALL_SIZE = 12             # Size of fireball sprite
+
 # Platform settings
 MIN_PLATFORM_WIDTH = 96   # 3 tiles
 MAX_PLATFORM_WIDTH = 256  # 8 tiles
