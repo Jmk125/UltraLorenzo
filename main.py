@@ -213,6 +213,8 @@ class Game:
             "Procedural worlds with escalating danger",
             "Defeat enemies & collect coins to gain XP",
             "Level up for random permanent bonuses",
+            "Arrow keys to move, SPACE to jump",
+            "Hold SHIFT to run & jump farther",
             "Press SPACE or ENTER to begin"
         ]
         for idx, line in enumerate(lines):
