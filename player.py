@@ -36,7 +36,8 @@ class Player(pygame.sprite.Sprite):
         self.xp = 0
         self.xp_to_next = 100
         self.score_multiplier = 1.0
-        self.speed = PLAYER_SPEED
+        self.walk_speed = PLAYER_WALK_SPEED
+        self.run_speed = PLAYER_RUN_SPEED
         self.jump_power = JUMP_POWER
         
     def load_images(self):
@@ -244,23 +245,46 @@ class Player(pygame.sprite.Sprite):
         
         # Get keyboard input
         keys = pygame.key.get_pressed()
-        self.vel_x = 0
         self.walking = False
 
         # Check if running (Shift key held)
         self.is_running = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
 
-        # Set movement speed based on running
-        current_speed = PLAYER_RUN_SPEED if self.is_running else self.speed
+        # Set target speed and acceleration based on running
+        if self.is_running:
+            target_speed = self.run_speed
+            acceleration = PLAYER_RUN_ACCELERATION
+            deceleration = PLAYER_RUN_DECELERATION
+        else:
+            target_speed = self.walk_speed
+            acceleration = PLAYER_WALK_ACCELERATION
+            deceleration = PLAYER_WALK_DECELERATION
 
+        # Apply movement with acceleration
         if keys[pygame.K_LEFT]:
-            self.vel_x = -current_speed
+            if self.vel_x > -target_speed:
+                self.vel_x -= acceleration
+                if self.vel_x < -target_speed:
+                    self.vel_x = -target_speed
             self.facing_right = False
             self.walking = True
-        if keys[pygame.K_RIGHT]:
-            self.vel_x = current_speed
+        elif keys[pygame.K_RIGHT]:
+            if self.vel_x < target_speed:
+                self.vel_x += acceleration
+                if self.vel_x > target_speed:
+                    self.vel_x = target_speed
             self.facing_right = True
             self.walking = True
+        else:
+            # Apply deceleration when no input
+            if self.vel_x > 0:
+                self.vel_x -= deceleration
+                if self.vel_x < 0:
+                    self.vel_x = 0
+            elif self.vel_x < 0:
+                self.vel_x += deceleration
+                if self.vel_x > 0:
+                    self.vel_x = 0
             
         # Update animation
         self.animate()
@@ -279,10 +303,7 @@ class Player(pygame.sprite.Sprite):
         if self.rect.left < 0:
             self.rect.left = 0
 
-        # Check if reached end of level (after the final boss area)
-        # Final boss is at LEVEL_WIDTH - 270, so trigger completion after that
-        if self.rect.right > LEVEL_WIDTH - 100:
-            self.game.on_level_complete()
+        # Note: Level completion now triggered by collecting final box
 
     def collect_coin(self):
         self.score += int(10 * self.score_multiplier)

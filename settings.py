@@ -22,13 +22,23 @@ CAMERA_SLACK = 200
 # Player settings
 PLAYER_WIDTH = 32
 PLAYER_HEIGHT = 48
-PLAYER_SPEED = 5
-PLAYER_RUN_SPEED = 8  # Speed when running
-JUMP_POWER = -15
-JUMP_POWER_RUNNING = -18  # Higher jump when running
-GRAVITY = 0.8
-PLAYER_SPAWN_X = 100  # Added this
-PLAYER_SPAWN_Y = 400  # Added this
+
+# Movement physics (tweakable)
+PLAYER_WALK_SPEED = 5          # Walking speed
+PLAYER_RUN_SPEED = 8            # Running speed
+PLAYER_WALK_ACCELERATION = 1.0  # How fast player reaches walk speed
+PLAYER_RUN_ACCELERATION = 1.5   # How fast player reaches run speed
+PLAYER_WALK_DECELERATION = 0.8  # Friction when stopping from walk
+PLAYER_RUN_DECELERATION = 0.6   # Friction when stopping from run
+
+# Jump physics (tweakable)
+JUMP_POWER = -15                # Normal jump strength
+JUMP_POWER_RUNNING = -16        # Running jump (barely higher)
+GRAVITY = 0.8                   # Gravity strength
+
+# Spawn and stats
+PLAYER_SPAWN_X = 100
+PLAYER_SPAWN_Y = 400
 STARTING_LIVES = 3
 PLAYER_INVULNERABILITY_TIME = 1000  # milliseconds of invulnerability after getting hit
 
