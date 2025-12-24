@@ -3,7 +3,7 @@ import random
 import math
 from settings import *
 from enemies import WalkerEnemy, HopperEnemy, FlyerEnemy
-from powerups import PowerUpBox
+from powerups import PowerUpBox, FinalBox
 
 THEMES = [
     {
@@ -307,7 +307,8 @@ class LevelGenerator:
         powerup_platform = Platform(end_x + 250, LEVEL_HEIGHT - 220, 120, PLATFORM_HEIGHT,
                                     theme["platform_top"], theme["platform_side"])
         platforms.add(powerup_platform)
-        final_box = PowerUpBox(end_x + 280, LEVEL_HEIGHT - 270)
+        # Create special final box that triggers level completion
+        final_box = FinalBox(end_x + 280, LEVEL_HEIGHT - 270, self.game)
         powerup_boxes.add(final_box)
 
         for i in range(6):
