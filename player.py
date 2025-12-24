@@ -361,7 +361,9 @@ class Player(pygame.sprite.Sprite):
         return name
 
     def _boost_speed(self):
-        self.speed = min(self.speed + 0.3, PLAYER_SPEED + 3)
+        # Boost both walk and run speeds
+        self.walk_speed = min(self.walk_speed + 0.3, PLAYER_WALK_SPEED + 3)
+        self.run_speed = min(self.run_speed + 0.3, PLAYER_RUN_SPEED + 3)
 
     def _boost_jump(self):
         self.jump_power -= 0.5
