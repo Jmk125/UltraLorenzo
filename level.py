@@ -260,9 +260,17 @@ class LevelGenerator:
                                     theme["platform_top"], theme["platform_side"])
             platforms.add(platform)
 
-            coin_count = random.randint(1, difficulty_profile["coin_cluster_size"])
+            # Use fixed spacing for coins instead of platform-dependent spacing
+            COIN_SPACING = 45  # Fixed spacing between coins
+            max_coins = max(1, (width - 20) // COIN_SPACING)  # Calculate how many coins fit
+            coin_count = min(random.randint(1, difficulty_profile["coin_cluster_size"]), max_coins)
+
+            # Center the coins on the platform
+            total_coin_width = (coin_count - 1) * COIN_SPACING if coin_count > 1 else 0
+            start_offset = (width - total_coin_width) // 2
+
             for i in range(coin_count):
-                offset = (i + 1) * (width // (coin_count + 1))
+                offset = start_offset + (i * COIN_SPACING)
                 coin = Coin(current_x + offset - COIN_SIZE // 2, y - 50)
                 coins.add(coin)
 

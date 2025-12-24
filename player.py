@@ -16,7 +16,8 @@ class Player(pygame.sprite.Sprite):
         self.vel_y = 0
         self.on_ground = False
         self.facing_right = True
-        
+        self.is_running = False
+
         # Animation
         self.walking = False
         self.animation_frame = 0
@@ -39,25 +40,94 @@ class Player(pygame.sprite.Sprite):
         self.jump_power = JUMP_POWER
         
     def load_images(self):
-        # Create temporary colored rectangles - replace with actual sprites later
-        self.standing_image = pygame.Surface((PLAYER_WIDTH, PLAYER_HEIGHT))
-        self.standing_image.fill(RED)
-        pygame.draw.rect(self.standing_image, (150, 0, 0), 
-                        (0, PLAYER_HEIGHT//2, PLAYER_WIDTH, PLAYER_HEIGHT//2))
-        
+        # Create pixel art Lorenzo character (Mario-styled)
+        self.standing_image = self.create_standing_sprite()
+
         # Walking animation frames
         self.walking_frames_r = []
         self.walking_frames_l = []
-        
-        # Create two slightly different frames for walking animation
-        for i in range(2):
-            frame = pygame.Surface((PLAYER_WIDTH, PLAYER_HEIGHT))
-            frame.fill(RED)
-            offset = 2 if i == 0 else -2
-            pygame.draw.rect(frame, (150, 0, 0),
-                           (0, PLAYER_HEIGHT//2 + offset, PLAYER_WIDTH, PLAYER_HEIGHT//2))
+
+        # Create walking animation frames
+        for i in range(3):
+            frame = self.create_walking_sprite(i)
             self.walking_frames_r.append(frame)
             self.walking_frames_l.append(pygame.transform.flip(frame, True, False))
+
+    def create_standing_sprite(self):
+        """Create a pixel art standing sprite for Lorenzo"""
+        sprite = pygame.Surface((PLAYER_WIDTH, PLAYER_HEIGHT), pygame.SRCALPHA)
+
+        # Head/face (skin color)
+        skin = (255, 220, 177)
+        # Red cap
+        pygame.draw.rect(sprite, (220, 20, 20), (8, 8, 16, 8))
+        # Cap brim
+        pygame.draw.rect(sprite, (180, 15, 15), (6, 16, 20, 4))
+
+        # Face
+        pygame.draw.rect(sprite, skin, (10, 20, 12, 10))
+        # Eyes
+        pygame.draw.rect(sprite, BLACK, (12, 22, 3, 3))
+        pygame.draw.rect(sprite, BLACK, (17, 22, 3, 3))
+        # Mustache
+        pygame.draw.rect(sprite, (80, 50, 30), (10, 26, 12, 4))
+
+        # Blue shirt/overalls
+        pygame.draw.rect(sprite, (30, 100, 220), (8, 30, 16, 10))
+        # Red overalls
+        pygame.draw.rect(sprite, (220, 20, 20), (10, 38, 12, 6))
+
+        # Legs (blue pants)
+        pygame.draw.rect(sprite, (30, 100, 220), (10, 40, 5, 6))
+        pygame.draw.rect(sprite, (30, 100, 220), (17, 40, 5, 6))
+
+        # Brown shoes
+        pygame.draw.rect(sprite, (100, 60, 20), (8, 44, 7, 4))
+        pygame.draw.rect(sprite, (100, 60, 20), (17, 44, 7, 4))
+
+        return sprite
+
+    def create_walking_sprite(self, frame_num):
+        """Create walking animation frames"""
+        sprite = pygame.Surface((PLAYER_WIDTH, PLAYER_HEIGHT), pygame.SRCALPHA)
+
+        skin = (255, 220, 177)
+        # Red cap
+        pygame.draw.rect(sprite, (220, 20, 20), (8, 8, 16, 8))
+        # Cap brim
+        pygame.draw.rect(sprite, (180, 15, 15), (6, 16, 20, 4))
+
+        # Face
+        pygame.draw.rect(sprite, skin, (10, 20, 12, 10))
+        # Eyes
+        pygame.draw.rect(sprite, BLACK, (12, 22, 3, 3))
+        pygame.draw.rect(sprite, BLACK, (17, 22, 3, 3))
+        # Mustache
+        pygame.draw.rect(sprite, (80, 50, 30), (10, 26, 12, 4))
+
+        # Blue shirt
+        pygame.draw.rect(sprite, (30, 100, 220), (8, 30, 16, 10))
+        # Red overalls
+        pygame.draw.rect(sprite, (220, 20, 20), (10, 38, 12, 6))
+
+        # Animate legs based on frame
+        if frame_num == 0:  # Standing neutral
+            pygame.draw.rect(sprite, (30, 100, 220), (10, 40, 5, 6))
+            pygame.draw.rect(sprite, (30, 100, 220), (17, 40, 5, 6))
+            pygame.draw.rect(sprite, (100, 60, 20), (8, 44, 7, 4))
+            pygame.draw.rect(sprite, (100, 60, 20), (17, 44, 7, 4))
+        elif frame_num == 1:  # Left leg forward
+            pygame.draw.rect(sprite, (30, 100, 220), (8, 40, 5, 6))
+            pygame.draw.rect(sprite, (30, 100, 220), (17, 41, 5, 6))
+            pygame.draw.rect(sprite, (100, 60, 20), (6, 44, 7, 4))
+            pygame.draw.rect(sprite, (100, 60, 20), (17, 45, 7, 4))
+        else:  # Right leg forward
+            pygame.draw.rect(sprite, (30, 100, 220), (10, 41, 5, 6))
+            pygame.draw.rect(sprite, (30, 100, 220), (19, 40, 5, 6))
+            pygame.draw.rect(sprite, (100, 60, 20), (8, 45, 7, 4))
+            pygame.draw.rect(sprite, (100, 60, 20), (19, 44, 7, 4))
+
+        return sprite
 
     def spawn(self):
         """Reset player position to spawn point"""
@@ -70,7 +140,11 @@ class Player(pygame.sprite.Sprite):
     def jump(self):
         """Make the player jump if they're on the ground"""
         if self.on_ground:
-            self.vel_y = self.jump_power
+            # Jump higher and farther when running
+            if self.is_running:
+                self.vel_y = JUMP_POWER_RUNNING
+            else:
+                self.vel_y = self.jump_power
             self.on_ground = False
     
     def die(self):
@@ -141,7 +215,9 @@ class Player(pygame.sprite.Sprite):
         """Update player animation"""
         if self.walking:
             self.animation_counter += 1
-            if self.animation_counter >= self.animation_delay:
+            # Faster animation when running
+            delay = 3 if self.is_running else self.animation_delay
+            if self.animation_counter >= delay:
                 self.animation_counter = 0
                 self.animation_frame = (self.animation_frame + 1) % len(self.walking_frames_r)
                 if self.facing_right:
@@ -170,13 +246,19 @@ class Player(pygame.sprite.Sprite):
         keys = pygame.key.get_pressed()
         self.vel_x = 0
         self.walking = False
-        
+
+        # Check if running (Shift key held)
+        self.is_running = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+
+        # Set movement speed based on running
+        current_speed = PLAYER_RUN_SPEED if self.is_running else self.speed
+
         if keys[pygame.K_LEFT]:
-            self.vel_x = -self.speed
+            self.vel_x = -current_speed
             self.facing_right = False
             self.walking = True
         if keys[pygame.K_RIGHT]:
-            self.vel_x = self.speed
+            self.vel_x = current_speed
             self.facing_right = True
             self.walking = True
             
@@ -196,9 +278,10 @@ class Player(pygame.sprite.Sprite):
         # Keep player on screen horizontally
         if self.rect.left < 0:
             self.rect.left = 0
-        
-        # Check if reached end of level
-        if self.rect.x > LEVEL_WIDTH - 250:
+
+        # Check if reached end of level (after the final boss area)
+        # Final boss is at LEVEL_WIDTH - 270, so trigger completion after that
+        if self.rect.right > LEVEL_WIDTH - 100:
             self.game.on_level_complete()
 
     def collect_coin(self):
