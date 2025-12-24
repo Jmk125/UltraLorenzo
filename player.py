@@ -1,6 +1,7 @@
 import pygame
 import random
 from settings import *
+from fireball import Fireball
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, game):
@@ -39,6 +40,12 @@ class Player(pygame.sprite.Sprite):
         self.walk_speed = PLAYER_WALK_SPEED
         self.run_speed = PLAYER_RUN_SPEED
         self.jump_power = JUMP_POWER
+        self.pending_level_ups = 0  # Queue level-ups for between-level screen
+
+        # Fireball ability
+        self.has_fireball = False
+        self.fireball_cooldown_timer = 0
+        self.fireballs = pygame.sprite.Group()
         
     def load_images(self):
         # Create pixel art Lorenzo character (Mario-styled)
@@ -137,6 +144,23 @@ class Player(pygame.sprite.Sprite):
         self.vel_x = 0
         self.vel_y = 0
         self.on_ground = False
+
+    def shoot_fireball(self):
+        """Shoot a fireball in the direction the player is facing."""
+        if not self.has_fireball or not FIREBALL_ENABLED:
+            return
+
+        current_time = pygame.time.get_ticks()
+        if current_time - self.fireball_cooldown_timer < FIREBALL_COOLDOWN:
+            return
+
+        self.fireball_cooldown_timer = current_time
+        direction = 1 if self.facing_right else -1
+        spawn_x = self.rect.centerx + (20 * direction)
+        spawn_y = self.rect.centery
+        fireball = Fireball(spawn_x, spawn_y, direction, self.game)
+        self.fireballs.add(fireball)
+        self.game.all_sprites.add(fireball)
     
     def jump(self):
         """Make the player jump if they're on the ground"""
@@ -236,9 +260,12 @@ class Player(pygame.sprite.Sprite):
         # Update invulnerability
         self.handle_invulnerability()
 
+        # Update fireballs
+        self.fireballs.update()
+
         # Apply gravity
         self.vel_y += GRAVITY
-        
+
         # Check if fallen off the map
         if self.rect.top > LEVEL_HEIGHT:
             self.die()
@@ -345,31 +372,33 @@ class Player(pygame.sprite.Sprite):
         while self.xp >= self.xp_to_next:
             self.xp -= self.xp_to_next
             self.level += 1
-            bonus_name = self.apply_level_up_bonus()
+            self.pending_level_ups += 1  # Queue level-up for between-level screen
             self.xp_to_next = int(self.xp_to_next * 1.35)
-            self.game.push_notification(f"Level {self.level}: {bonus_name}")
+            self.game.push_notification(f"Level {self.level}!")
 
-    def apply_level_up_bonus(self):
-        bonuses = [
-            ("Fleet Boots", self._boost_speed),
-            ("Sky Shoes", self._boost_jump),
-            ("Spirit Heart", self._boost_life),
-            ("Treasure Sense", self._boost_score)
-        ]
-        name, func = random.choice(bonuses)
-        func()
-        return name
+    def apply_upgrade(self, upgrade_name):
+        """Apply a chosen upgrade to the player."""
+        if upgrade_name == "Fleet Boots":
+            self._boost_speed()
+        elif upgrade_name == "Sky Shoes":
+            self._boost_jump()
+        elif upgrade_name == "Spirit Heart":
+            self._boost_life()
+        elif upgrade_name == "Treasure Sense":
+            self._boost_score()
+        elif upgrade_name == "Fireball":
+            self.has_fireball = True
 
     def _boost_speed(self):
         # Boost both walk and run speeds
-        self.walk_speed = min(self.walk_speed + 0.3, PLAYER_WALK_SPEED + 3)
-        self.run_speed = min(self.run_speed + 0.3, PLAYER_RUN_SPEED + 3)
+        self.walk_speed = min(self.walk_speed + UPGRADE_SPEED_BOOST, PLAYER_WALK_SPEED + UPGRADE_MAX_SPEED)
+        self.run_speed = min(self.run_speed + UPGRADE_SPEED_BOOST, PLAYER_RUN_SPEED + UPGRADE_MAX_SPEED)
 
     def _boost_jump(self):
-        self.jump_power -= 0.5
+        self.jump_power -= UPGRADE_JUMP_BOOST
 
     def _boost_life(self):
         self.lives += 1
 
     def _boost_score(self):
-        self.score_multiplier = min(self.score_multiplier + 0.15, 3.0)
+        self.score_multiplier = min(self.score_multiplier + UPGRADE_SCORE_MULTIPLIER, UPGRADE_MAX_SCORE_MULT)
