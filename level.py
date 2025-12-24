@@ -185,7 +185,8 @@ class LevelGenerator:
         return random.choice(THEMES)
 
     def is_gap_jumpable(self, gap_width, platform_height_diff):
-        return (gap_width <= PLAYER_SPEED * 6 and
+        # Use run speed for gap calculations since player can run and jump
+        return (gap_width <= PLAYER_RUN_SPEED * 6 and
                 abs(platform_height_diff) <= MAX_JUMP_HEIGHT)
 
     def generate_level(self, difficulty_profile):
