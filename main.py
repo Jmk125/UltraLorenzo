@@ -11,7 +11,9 @@ from camera import Camera
 class Game:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        # Create fullscreen display with scaled rendering
+        # This scales the game to fullscreen while keeping aspect ratio
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.FULLSCREEN | pygame.SCALED)
         pygame.display.set_caption("UltraLorenzo")
         self.clock = pygame.time.Clock()
 
@@ -25,6 +27,9 @@ class Game:
         self.player = None
         self.level_generator = LevelGenerator(self)
         self.all_sprites = pygame.sprite.Group()
+        self.background = pygame.sprite.Group()
+        self.midground = pygame.sprite.Group()
+        self.foreground = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
         self.coins = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
@@ -55,6 +60,9 @@ class Game:
     def setup_new_game(self):
         self.camera = Camera(LEVEL_WIDTH, LEVEL_HEIGHT)
         self.all_sprites = pygame.sprite.Group()
+        self.background = pygame.sprite.Group()
+        self.midground = pygame.sprite.Group()
+        self.foreground = pygame.sprite.Group()
         self.platforms = pygame.sprite.Group()
         self.coins = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
@@ -87,19 +95,18 @@ class Game:
         difficulty = self.get_difficulty_profile()
         background, midground, platforms, coins, enemies, powerups, foreground, theme = self.level_generator.generate_level(difficulty)
 
+        # Keep separate layer groups for parallax rendering
+        self.background = background
+        self.midground = midground
+        self.foreground = foreground
         self.platforms = platforms
         self.coins = coins
         self.enemies = enemies
         self.powerup_boxes = powerups
         self.current_theme = theme
 
-        self.all_sprites.empty()
-        for sprite in background:
-            self.all_sprites.add(sprite)
-        for sprite in midground:
-            self.all_sprites.add(sprite)
-        for sprite in foreground:
-            self.all_sprites.add(sprite)
+        # Gameplay sprites (non-background) for updating
+        self.all_sprites = pygame.sprite.Group()
         for sprite in self.platforms:
             self.all_sprites.add(sprite)
         for sprite in self.powerup_boxes:
@@ -156,6 +163,7 @@ class Game:
 
     def update_gameplay(self):
         self.all_sprites.update()
+        self.midground.update()  # Update clouds for floating animation
         self.camera.update(self.player)
 
         coin_hits = pygame.sprite.spritecollide(self.player, self.coins, True)
@@ -170,9 +178,26 @@ class Game:
 
     def draw_gameplay(self):
         self.screen.fill(self.current_theme.get("sky", SKY_BLUE))
+
+        # Draw background layer with parallax (mountains - slowest)
+        for sprite in self.background.sprites():
+            parallax_factor = getattr(sprite, 'parallax_factor', 0.2)
+            self.screen.blit(sprite.image, self.camera.apply_parallax(sprite, parallax_factor))
+
+        # Draw midground layer with parallax (hills and clouds - medium speed)
+        for sprite in self.midground.sprites():
+            parallax_factor = getattr(sprite, 'parallax_factor', 0.4)
+            self.screen.blit(sprite.image, self.camera.apply_parallax(sprite, parallax_factor))
+
+        # Draw gameplay sprites (platforms, coins, enemies, player - normal speed)
         for sprite in self.all_sprites.sprites():
             if not (sprite == self.player and self.player.invulnerable and self.player.blinking):
                 self.screen.blit(sprite.image, self.camera.apply(sprite))
+
+        # Draw foreground layer (end markers - normal speed)
+        for sprite in self.foreground.sprites():
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
+
         self.draw_hud()
 
     def draw_hud(self):
