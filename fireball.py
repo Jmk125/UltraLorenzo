@@ -26,6 +26,8 @@ class Fireball(pygame.sprite.Sprite):
         pygame.draw.circle(self.image, (255, 100, 0), (FIREBALL_SIZE // 2, FIREBALL_SIZE // 2), FIREBALL_SIZE // 2)
         pygame.draw.circle(self.image, (255, 200, 50), (FIREBALL_SIZE // 2, FIREBALL_SIZE // 2), FIREBALL_SIZE // 3)
         pygame.draw.circle(self.image, (255, 255, 150), (FIREBALL_SIZE // 2, FIREBALL_SIZE // 2), FIREBALL_SIZE // 6)
+        # Store original image for rotation
+        self.original_image = self.image.copy()
 
     def update(self):
         """Update fireball position and check collisions."""
@@ -60,9 +62,9 @@ class Fireball(pygame.sprite.Sprite):
         if self.rect.top > LEVEL_HEIGHT or self.rect.right < 0 or self.rect.left > LEVEL_WIDTH:
             self.kill()
 
-        # Animate rotation
+        # Animate rotation (rotate from original to prevent growth)
         self.animation_frame += 15 * self.direction
-        rotated = pygame.transform.rotate(self.image, self.animation_frame)
+        rotated = pygame.transform.rotate(self.original_image, self.animation_frame)
         old_center = self.rect.center
         self.image = rotated
         self.rect = self.image.get_rect()
