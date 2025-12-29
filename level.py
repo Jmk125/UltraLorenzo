@@ -59,6 +59,7 @@ class Hill(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = base_y - height
+        self.parallax_factor = PARALLAX_HILL  # Hills move at 50% of camera speed
 
 
 class Mountain(pygame.sprite.Sprite):
@@ -74,6 +75,7 @@ class Mountain(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        self.parallax_factor = PARALLAX_MOUNTAIN  # Mountains move at 20% of camera speed (far background)
 
 
 class Cloud(pygame.sprite.Sprite):
@@ -98,6 +100,7 @@ class Cloud(pygame.sprite.Sprite):
         self.rect.y = y
         self.speed = random.uniform(0.2, 0.5)
         self.float_x = float(x)
+        self.parallax_factor = PARALLAX_CLOUD  # Clouds move at 30% of camera speed
 
     def update(self):
         self.float_x += self.speed

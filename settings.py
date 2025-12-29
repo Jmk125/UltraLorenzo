@@ -78,3 +78,8 @@ COIN_SIZE = 20
 
 # Powerup settings
 POWERUP_SIZE = 32
+
+# Parallax scrolling (tweakable)
+PARALLAX_MOUNTAIN = 0.2  # Mountains move at 20% of camera speed (far background)
+PARALLAX_CLOUD = 0.3     # Clouds move at 30% of camera speed
+PARALLAX_HILL = 0.5      # Hills move at 50% of camera speed (closer to foreground)

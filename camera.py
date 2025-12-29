@@ -10,6 +10,19 @@ class Camera:
     def apply(self, entity):
         return entity.rect.move(self.camera.topleft)
 
+    def apply_parallax(self, entity, parallax_factor):
+        """Apply camera offset with parallax effect.
+
+        Args:
+            entity: The sprite to apply parallax to
+            parallax_factor: How much the sprite moves with camera (0.0-1.0)
+                           0.0 = doesn't move at all (far background)
+                           1.0 = moves with camera (foreground)
+        """
+        parallax_x = int(self.camera.x * parallax_factor)
+        parallax_y = int(self.camera.y * parallax_factor)
+        return entity.rect.move(parallax_x, parallax_y)
+
     def update(self, target):
         x = -target.rect.centerx + WINDOW_WIDTH // 2
         y = -target.rect.centery + WINDOW_HEIGHT // 2
