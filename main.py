@@ -32,6 +32,7 @@ class Game:
         self.notifications = []
         self.current_theme = {"name": "Sky Realm", "sky": SKY_BLUE}
         self.title_particles = self.create_title_particles()
+        self.selected_upgrade_index = 0  # For navigating level-up menu
 
     def create_title_particles(self):
         particles = []
@@ -128,6 +129,7 @@ class Game:
         if self.player.pending_level_ups > 0:
             self.state = "level_up"
             self.upgrade_choices = self.get_upgrade_choices()
+            self.selected_upgrade_index = 0  # Reset selection
         else:
             self.generate_new_level()
             self.push_notification(f"World {self.level_number} intensifies")
@@ -272,60 +274,94 @@ class Game:
         self.screen.blit(restart_text, restart_rect)
 
     def draw_level_up(self):
-        """Draw the level-up screen with upgrade choices."""
-        self.screen.fill((20, 10, 40))
+        """Draw the full-screen level-up menu with navigable list."""
+        # Full-screen gradient background
+        for y in range(WINDOW_HEIGHT):
+            color_value = int(20 + (y / WINDOW_HEIGHT) * 40)
+            pygame.draw.line(self.screen, (color_value // 3, color_value // 4, color_value),
+                           (0, y), (WINDOW_WIDTH, y))
 
-        # Title
-        title_font = pygame.font.Font(None, 72)
+        # Animated particles/stars
+        current_time = pygame.time.get_ticks()
+        for i in range(30):
+            x = (i * 97 + current_time // 20) % WINDOW_WIDTH
+            y = (i * 73) % WINDOW_HEIGHT
+            size = 1 + (i % 3)
+            pygame.draw.circle(self.screen, (255, 255, 200, 100), (x, y), size)
+
+        # Title with glow effect
+        title_font = pygame.font.Font(None, 96)
         title = title_font.render("LEVEL UP!", True, (255, 215, 0))
-        title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, 80))
+        title_rect = title.get_rect(center=(WINDOW_WIDTH // 2, 100))
+        # Glow effect
+        glow = title_font.render("LEVEL UP!", True, (255, 150, 0))
+        for offset in [(2, 2), (-2, -2), (2, -2), (-2, 2)]:
+            glow_rect = glow.get_rect(center=(WINDOW_WIDTH // 2 + offset[0], 100 + offset[1]))
+            self.screen.blit(glow, glow_rect)
         self.screen.blit(title, title_rect)
 
-        # Level info
-        info_font = pygame.font.Font(None, 36)
+        # Level info with stats
+        info_font = pygame.font.Font(None, 40)
         level_text = info_font.render(f"Hero Level {self.player.level}", True, WHITE)
-        level_rect = level_text.get_rect(center=(WINDOW_WIDTH // 2, 140))
+        level_rect = level_text.get_rect(center=(WINDOW_WIDTH // 2, 170))
         self.screen.blit(level_text, level_rect)
 
+        stats_font = pygame.font.Font(None, 28)
+        stats = f"Score: {self.player.score}  |  Lives: {self.player.lives}  |  World: {self.level_number}"
+        stats_text = stats_font.render(stats, True, (200, 200, 200))
+        stats_rect = stats_text.get_rect(center=(WINDOW_WIDTH // 2, 210))
+        self.screen.blit(stats_text, stats_rect)
+
         # Instructions
-        instruction_font = pygame.font.Font(None, 28)
-        instruction = instruction_font.render("Choose an upgrade (Press 1, 2, or 3)", True, (200, 200, 200))
-        instruction_rect = instruction.get_rect(center=(WINDOW_WIDTH // 2, 190))
+        instruction_font = pygame.font.Font(None, 32)
+        instruction = instruction_font.render("Use UP/DOWN arrows to navigate, ENTER or SPACE to select", True, (180, 180, 180))
+        instruction_rect = instruction.get_rect(center=(WINDOW_WIDTH // 2, 260))
         self.screen.blit(instruction, instruction_rect)
 
-        # Draw upgrade options
-        option_font = pygame.font.Font(None, 40)
-        desc_font = pygame.font.Font(None, 28)
+        # Draw upgrade options as a vertical list
+        option_font = pygame.font.Font(None, 48)
+        desc_font = pygame.font.Font(None, 32)
 
-        box_width = 220
-        box_height = 120
-        spacing = 30
-        start_y = 250
-        total_width = (box_width * 3) + (spacing * 2)
-        start_x = (WINDOW_WIDTH - total_width) // 2
+        box_width = 600
+        box_height = 90
+        spacing = 20
+        start_y = 320
+        start_x = (WINDOW_WIDTH - box_width) // 2
 
         for i, upgrade in enumerate(self.upgrade_choices):
-            x = start_x + i * (box_width + spacing)
-            y = start_y
+            y = start_y + i * (box_height + spacing)
+            is_selected = (i == self.selected_upgrade_index)
 
-            # Draw box background
-            box_rect = pygame.Rect(x, y, box_width, box_height)
-            pygame.draw.rect(self.screen, (60, 40, 80), box_rect)
-            pygame.draw.rect(self.screen, (255, 215, 0), box_rect, 3)
+            # Draw box background with selection highlight
+            box_rect = pygame.Rect(start_x, y, box_width, box_height)
+            if is_selected:
+                # Selected item - bright and pulsing
+                pulse = abs((current_time // 10) % 100 - 50) / 50.0
+                glow_color = (80 + int(40 * pulse), 60 + int(30 * pulse), 100 + int(50 * pulse))
+                # Draw glow
+                glow_rect = pygame.Rect(start_x - 5, y - 5, box_width + 10, box_height + 10)
+                pygame.draw.rect(self.screen, glow_color, glow_rect, border_radius=10)
+                pygame.draw.rect(self.screen, (100, 80, 140), box_rect, border_radius=8)
+                pygame.draw.rect(self.screen, (255, 215, 0), box_rect, 4, border_radius=8)
+                # Selection arrow
+                arrow_font = pygame.font.Font(None, 60)
+                arrow = arrow_font.render("▶", True, (255, 215, 0))
+                arrow_rect = arrow.get_rect(center=(start_x - 40, y + box_height // 2))
+                self.screen.blit(arrow, arrow_rect)
+            else:
+                # Unselected item - darker
+                pygame.draw.rect(self.screen, (40, 30, 60), box_rect, border_radius=8)
+                pygame.draw.rect(self.screen, (120, 100, 140), box_rect, 2, border_radius=8)
 
-            # Draw number
-            number_text = option_font.render(str(i + 1), True, (255, 215, 0))
-            number_rect = number_text.get_rect(center=(x + box_width // 2, y + 25))
-            self.screen.blit(number_text, number_rect)
-
-            # Draw upgrade name
-            name_text = desc_font.render(upgrade["name"], True, WHITE)
-            name_rect = name_text.get_rect(center=(x + box_width // 2, y + 60))
+            # Draw upgrade name (larger if selected)
+            name_font = option_font if is_selected else pygame.font.Font(None, 42)
+            name_text = name_font.render(upgrade["name"], True, WHITE if is_selected else (200, 200, 200))
+            name_rect = name_text.get_rect(midleft=(start_x + 30, y + 30))
             self.screen.blit(name_text, name_rect)
 
             # Draw upgrade description
-            desc_text = desc_font.render(upgrade["desc"], True, (200, 200, 200))
-            desc_rect = desc_text.get_rect(center=(x + box_width // 2, y + 90))
+            desc_text = desc_font.render(upgrade["desc"], True, (220, 220, 220) if is_selected else (150, 150, 150))
+            desc_rect = desc_text.get_rect(midleft=(start_x + 30, y + 60))
             self.screen.blit(desc_text, desc_rect)
 
     def run(self):
@@ -347,12 +383,12 @@ class Game:
                     elif self.state == "game_over" and event.key == pygame.K_r:
                         self.state = "title"
                     elif self.state == "level_up":
-                        if event.key == pygame.K_1 and len(self.upgrade_choices) >= 1:
-                            self.apply_upgrade_choice(0)
-                        elif event.key == pygame.K_2 and len(self.upgrade_choices) >= 2:
-                            self.apply_upgrade_choice(1)
-                        elif event.key == pygame.K_3 and len(self.upgrade_choices) >= 3:
-                            self.apply_upgrade_choice(2)
+                        if event.key == pygame.K_UP:
+                            self.selected_upgrade_index = (self.selected_upgrade_index - 1) % len(self.upgrade_choices)
+                        elif event.key == pygame.K_DOWN:
+                            self.selected_upgrade_index = (self.selected_upgrade_index + 1) % len(self.upgrade_choices)
+                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            self.apply_upgrade_choice(self.selected_upgrade_index)
 
             if self.state == "playing":
                 self.update_gameplay()
@@ -378,6 +414,7 @@ class Game:
         # If more level-ups pending, show another screen
         if self.player.pending_level_ups > 0:
             self.upgrade_choices = self.get_upgrade_choices()
+            self.selected_upgrade_index = 0  # Reset selection for next screen
         else:
             # No more level-ups, continue to next level
             self.state = "playing"
